@@ -1,0 +1,12 @@
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=0 --device=0  > ./image_transfer_record/random_seed_record_0.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=1 --device=0  > ./image_transfer_record/random_seed_record_1.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=2 --device=0  > ./image_transfer_record/random_seed_record_2.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=3 --device=0  > ./image_transfer_record/random_seed_record_3.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=4 --device=0  > ./image_transfer_record/random_seed_record_4.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=5 --device=0  > ./image_transfer_record/random_seed_record_5.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=6 --device=1  > ./image_transfer_record/random_seed_record_6.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=7 --device=1  > ./image_transfer_record/random_seed_record_7.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=8 --device=1  > ./image_transfer_record/random_seed_record_8.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=9 --device=1  > ./image_transfer_record/random_seed_record_9.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=10 --device=1  > ./image_transfer_record/random_seed_record_10.txt &
+nohup python -u Assumption_idea_image_classification_transfer_learning_random_seed.py --random_seed=11 --device=1  > ./image_transfer_record/random_seed_record_11.txt &
