@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description='Random seed parser')
 parser.add_argument('--random_seed',type=int,default=0)
 parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--model',type=str,default='Resnet') # option 'Resnet','densenet','vgg16'
-parser.add_argument('--noise_intense',type=flat,default=1e-04)
+parser.add_argument('--noise_intense',type=float,default=1e-04)
 args = parser.parse_args()
 
 #----------------------------------------------
@@ -47,7 +47,7 @@ model_ft = Model_selection(models,device,name=args.model).model
 
 optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
 exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
-model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_'+args.model)
+no_perturbe_model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_'+args.model)
 
 # SOTA model densenet + perturbation --> finetuning
 for i in range(10):
@@ -56,5 +56,13 @@ for i in range(10):
     optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
     exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
     model_ft, finetune_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45, model_name=args.noise_intense+'_perturbation_'+args.model)
+    print('-----------------------------------')
+    rel_error = relative_error(no_perturbe_model_ft,model_ft)
+    min_err = np.inf
+    for idx,(name,_) in enumerate(model_ft.named_parameters()):
+        if rel_error[idx] < min_err:
+            min_err = rel_error[idx]
+            best_param_name = name
+    print('Minimum param name: ',best_param_name,' Relative error: ',min_err)
     if finetune_best_acc > origin_best_acc:
         print('-'*20+'Finetune better')
