@@ -47,7 +47,7 @@ model_ft = Model_selection(models,device,name=args.model).model
 
 optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
 exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
-no_perturbe_model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_'+args.model)
+no_perturbe_model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, dataset_sizes, num_epochs=45,model_name='no_perturbation_'+args.model)
 
 # SOTA model densenet + perturbation --> finetuning
 for i in range(10):

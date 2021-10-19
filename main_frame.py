@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 import time
+import copy
 
-def train_model(model,criterion,optimizer,scheduler,num_epochs=25,model_name='no_perturbation_resnet18'):
+def train_model(model,criterion,optimizer,scheduler,dataloaders,dataset_sizes,num_epochs=25,model_name='no_perturbation_resnet18'):
+    device = next(iter(model.parameters())).device
+
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.
-    
+       
     for epoch in range(num_epochs):
         for phase in ['train','val']:
             if phase == 'train':
@@ -107,7 +110,7 @@ class Model_selection():
             self.model.classifier = nn.Linear(num_ftrs,100)
         elif self.name == 'vgg16':
             self.model = models.vgg16(pretrained=True)
-            num_ftrs = model_ft.classifier[6].in_features
+            num_ftrs = self.model.classifier[6].in_features
             self.model.classifier[6] = nn.Linear(num_ftrs,100)
         self.model = self.model.to(self.device)
  
