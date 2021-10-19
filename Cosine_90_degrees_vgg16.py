@@ -18,6 +18,31 @@ import os
 import copy
 import argparse
 
+def topk_accuracy(model,dataloader,k=5):
+    '''
+    Goal: top K accuracy
+    Input variables:
+        model
+        dataloader (x,y)
+        K
+    Output value:
+        top-k accuracy
+    '''
+    device = next(model.parameters()).device
+    with torch.no_grad():
+        acc_cnt = 0
+        total_cnt = 0
+        for x,y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+            y_preds = model(x)
+            _,pred = torch.topk(y_preds,k,dim=1)
+            for idx,label in enumerate(y):
+                total_cnt += 1
+                if label in pred:
+                    acc_cnt += 1
+    return acc_cnt/total_cnt
+
 def torch_cosine_degree(a,b):
     '''
     function for obtaining the degrees between two different vectors
@@ -25,7 +50,7 @@ def torch_cosine_degree(a,b):
     cos(theta) = dot(a,b)/(norm(a)*norm(b)) --> mid
     theta = np.rad2deg(np.acos(mid))
     '''
-    mid = torch.dot(a,b)/torch.sqrt(torch.sum(a**2))/torch.sqrt(torch.sum(b**2))
+    mid = torch.dot(a,b)/(torch.sqrt(torch.sum(a**2))/torch.sqrt(torch.sum(b**2))+1e-18)
     theta = torch.rad2deg(torch.arccos(mid))
     return theta
 
@@ -34,29 +59,15 @@ parser.add_argument('--random_seed',type=int,default=0)
 parser.add_argument('--device',type=int,default=0)
 args = parser.parse_args()
 
-data_transforms = {
-    'train': transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-    ]),
-    'val': transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-    ]),
-}
-
-data_dir = './hymenoptera_data'
-image_datasets = {x:datasets.ImageFolder(os.path.join(data_dir,x),data_transforms[x])
-                 for x in ['train','val']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4)
-               for x in ['train','val']}
-dataset_sizes = {x: len(image_datasets[x]) for x in ['train','val']}
-class_names = image_datasets['train'].classes
-#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+transform = transforms.Compose(
+    [transforms.ToTensor(),
+    transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))])
+trainset = torchvision.datasets.CIFAR100(root='./CIFAR100',train=True,download=True,transform=transform)
+testset = torchvision.datasets.CIFAR100(root='./CIFAR100',train=False,download=False,transform=transform)
+dataloaders = {'train': torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=4),
+    'val': torch.utils.data.DataLoader(testset,batch_size=64,shuffle=False,num_workers=4)
+    }
+dataset_sizes = {'train': len(trainset), 'val': len(testset)}
 device = torch.device('cuda:'+str(args.device))
 
 def train_model(model,criterion,optimizer,scheduler,num_epochs=25,model_name='no_perturbation_resnet18'):
@@ -105,13 +116,17 @@ def train_model(model,criterion,optimizer,scheduler,num_epochs=25,model_name='no
         #print()
             
     time_elapsed = time.time() - since
+    model.load_state_dict(best_model_wts)
+    top1_acc = topk_accuracy(model,dataloaders['val'],k=1)
+    top5_acc = topk_accuracy(model,dataloaders['val'],k=5)
     print(f'Model name: {model_name}')
     print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
     print(f'Best val Acc: {best_acc:4f}')
+    print(f'Best Top-1 Acc: {top1_acc:4f}')
+    print(f'Best Top-5 Acc: {top5_acc:4f}')
     print('-'*20)
     print()
-    model.load_state_dict(best_model_wts)
-    return model
+    return model, best_acc
 
 def visualize_model(model,num_images=6):
     was_training = model.training
@@ -159,33 +174,39 @@ criterion = nn.CrossEntropyLoss()
 # SOTA model vgg16 --> finetuning
 model_ft = models.vgg16(pretrained=True)
 num_ftrs = model_ft.classifier[6].in_features
-model_ft.classifier[6] = nn.Linear(num_ftrs,2)
+model_ft.classifier[6] = nn.Linear(num_ftrs,100)
 model_ft = model_ft.to(device)
 
-optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
-exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25,model_name='no_perturbation_vgg16')
+#optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
+optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
+exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
+model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_vgg16')
 
 # SOTA model vgg16 + perturbation --> finetuning
-for i in range(100):
+for i in range(10):
     model_ft = models.vgg16(pretrained=True)
     num_ftrs = model_ft.classifier[6].in_features
-    model_ft.classifier[6] = nn.Linear(num_ftrs,2)
+    model_ft.classifier[6] = nn.Linear(num_ftrs,100)
     model_ft = model_ft.to(device)
     
     max_deg = 0.
+    total_deg = 0.
     for name,parameter in model_ft.named_parameters():
         #parameter.data.copy_(parameter+1e-04*torch.randn(parameter.size()).to(parameter.device))
         dummy_vector = parameter + 1e-04*torch.randn(parameter.size()).to(parameter.device)
         parameter.data.copy_(dummy_vector)
         deg = torch_cosine_degree(parameter.view(-1),dummy_vector.view(-1)).detach().cpu().numpy()
+        total_deg += deg
         if deg > max_deg:
             max_deg = deg
     
-    print(f'Maximum degree: {max_deg}')
-    optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
-    exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25, model_name='1e-04_perturbation_vgg16')
+    print(f'Maximum degree: {max_deg}, Total degree: {total_deg}')
+    #optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
+    optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
+    exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
+    model_ft, finetune_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45, model_name='1e-04_perturbation_vgg16')
+    if finetune_best_acc > origin_best_acc:
+        print('-'*20+'Finetune better')
     
     # # VGG16
     # #### no - perturbation finetuning model best_accuracy = 92.1569%

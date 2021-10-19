@@ -1,10 +1,10 @@
 '''
 Written by Hyunseok Hwang
-Date: 2021.10.05
+Date: 2021.10.19
 Goal: Verification of perturbation transfer learning is better than normal finetuning
+      using fisher information matrix
 '''
-# pytorch trnasfer learning tutorial 
-# https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -57,7 +57,7 @@ def torch_cosine_degree(a,b):
 parser = argparse.ArgumentParser(description='Random seed parser')
 parser.add_argument('--random_seed',type=int,default=0)
 parser.add_argument('--device',type=int,default=0)
-parser.add_argument('--model',type=str,default='alexnet')
+parser.add_argument('--model',type=str,default='Resnet') # option 'Resnet','densenet','vgg16'
 args = parser.parse_args()
 
 transform = transforms.Compose(
@@ -168,23 +168,24 @@ def set_seed(random_seed=101):
 
 random_seed = args.random_seed
 
-# SOTA model ResNet --> finetuning
+
+# SOTA model densenet --> finetuning
 criterion = nn.CrossEntropyLoss()
-model_ft = models.resnet18(pretrained=True)
-num_ftrs = model_ft.fc.in_features 
-model_ft.fc = nn.Linear(num_ftrs,100)
+model_ft = models.densenet161(pretrained=True)
+num_ftrs = model_ft.classifier.in_features
+model_ft.classifier = nn.Linear(num_ftrs,100)
 model_ft = model_ft.to(device)
 
 #optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
 optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
 exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
-model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_resnet18')
+model_ft, origin_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45,model_name='no_perturbation_densenet')
 
-# SOTA model ResNet + perturbation --> finetuning
-for i in range(100):
-    model_ft = models.resnet18(pretrained=True)
-    num_ftrs = model_ft.fc.in_features
-    model_ft.fc = nn.Linear(num_ftrs,100)
+# SOTA model densenet + perturbation --> finetuning
+for i in range(10):
+    model_ft = models.densenet161(pretrained=True)
+    num_ftrs = model_ft.classifier.in_features 
+    model_ft.classifier = nn.Linear(num_ftrs,100)
     model_ft = model_ft.to(device)
     
     max_deg = 0.
@@ -202,6 +203,6 @@ for i in range(100):
     #optimizer_ft = optim.SGD(model_ft.parameters(),lr=0.001, momentum=0.9)
     optimizer_ft = optim.Adam(model_ft.parameters(),lr=0.002)
     exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=500, gamma=0.1)
-    model_ft, finetune_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45, model_name='1e-04_perturbation_resnet18')
+    model_ft, finetune_best_acc = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=45, model_name='1e-04_perturbation_densenet')
     if finetune_best_acc > origin_best_acc:
         print('-'*20+'Finetune better')

@@ -1,0 +1,6 @@
+## NESOY Ignore File ##
+
+*.txt
+*.ipynb
+CIFAR100
+*_record
